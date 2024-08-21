@@ -640,9 +640,7 @@ class CarlaDataProvider(object):  # pylint: disable=too-many-public-methods
             if new_model != '':
                 bp_filter = new_model
             print("WARNING: Actor model {} not available. Using instead {}".format(model, new_model))
-            something_filter = CarlaDataProvider._blueprint_library.filter(bp_filter)
-            print(f"HELLO LOOK AT THIS: {something_filter}")
-            blueprint = CarlaDataProvider._rng.choice(something_filter)
+            blueprint = CarlaDataProvider._rng.choice(CarlaDataProvider._blueprint_library.filter(bp_filter))
 
         # Set the color
         if color:
