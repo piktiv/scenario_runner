@@ -36,7 +36,12 @@ class OpenScenarioConfiguration(ScenarioConfiguration):
 
         super(OpenScenarioConfiguration, self).__init__()
 
-        self.xml_tree = ET.parse(filename)
+        try:
+            self.xml_tree = ET.parse(filename)
+        except:
+            print(f"Tried to parse {filename} but it isn't correctly formatted or not an xml file")
+            raise
+
         self.filename = filename
         self._custom_params = custom_params if custom_params is not None else {}
 
