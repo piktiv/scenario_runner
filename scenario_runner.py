@@ -31,6 +31,7 @@ import signal
 import sys
 import time
 import json
+import py_trees
 
 try:
     # requires Python 3.8+
@@ -220,7 +221,8 @@ class ScenarioRunner(object):
         """
         Spawn or update the ego vehicles
         """
-
+        self.ego_vehicles.clear()
+        
         if not self._args.waitForEgo:
             for vehicle in ego_vehicles:
                 self.ego_vehicles.append(CarlaDataProvider.request_new_actor(vehicle.model,
@@ -398,12 +400,13 @@ class ScenarioRunner(object):
         print("Preparing scenario: " + config.name)
         try:
             self._prepare_ego_vehicles(config.ego_vehicles)
+            
             if self._args.openscenario:
-                scenario = OpenScenario(world=self.world,
-                                        ego_vehicles=self.ego_vehicles,
-                                        config=config,
-                                        config_file=self._args.openscenario,
-                                        timeout=100000)
+                    scenario = OpenScenario(world=self.world,
+                                            ego_vehicles=self.ego_vehicles,
+                                            config=config,
+                                            config_file=config.filename,
+                                            timeout=100000)
             elif self._args.route:
                 scenario = RouteScenario(world=self.world,
                                          config=config,
@@ -495,27 +498,38 @@ class ScenarioRunner(object):
 
                 self._cleanup()
         return result
+    
+    def _clear_blackboard(self):
+        list_of_forbidden_attr = ["get", "set"]
+        blackboard = py_trees.blackboard.Blackboard()
+        for attr in dir(blackboard):
+            if not attr.startswith("_") and not attr in list_of_forbidden_attr:
+                delattr(blackboard, attr)
 
     def _run_openscenario(self):
         """
         Run a scenario based on OpenSCENARIO
         """
+        for scenario in self._args.openscenario:
+            self._clear_blackboard()
+            # Load the scenario configurations provided in the config file
+            if not os.path.isfile(scenario):
+                print("File does not exist")
+                self._cleanup()
+                return False
+            
+            # TODO: Adapt params to handle a list
+            openscenario_params = {}
+            if self._args.openscenarioparams is not None:
+                for entry in self._args.openscenarioparams.split(','):
+                    [key, val] = [m.strip() for m in entry.split(':')]
+                    openscenario_params[key] = val
+                    
+            config = OpenScenarioConfiguration(scenario, self.client, openscenario_params)
 
-        # Load the scenario configurations provided in the config file
-        if not os.path.isfile(self._args.openscenario):
-            print("File does not exist")
+            result = self._load_and_run_scenario(config)
             self._cleanup()
-            return False
-
-        openscenario_params = {}
-        if self._args.openscenarioparams is not None:
-            for entry in self._args.openscenarioparams.split(','):
-                [key, val] = [m.strip() for m in entry.split(':')]
-                openscenario_params[key] = val
-        config = OpenScenarioConfiguration(self._args.openscenario, self.client, openscenario_params)
-
-        result = self._load_and_run_scenario(config)
-        self._cleanup()
+            
         return result
 
     def _run_osc2(self):
@@ -541,14 +555,19 @@ class ScenarioRunner(object):
         Run all scenarios according to provided commandline args
         """
         result = True
-        if self._args.openscenario:
-            result = self._run_openscenario()
-        elif self._args.route:
-            result = self._run_route()
-        elif self._args.openscenario2:
-            result = self._run_osc2()
-        else:
-            result = self._run_scenarios()
+        run_once = True
+
+        while(self._args.loop or run_once):
+            if self._args.openscenario:
+                result = self._run_openscenario()
+            elif self._args.route:
+                result = self._run_route()
+            elif self._args.openscenario2:
+                result = self._run_osc2()
+            else:
+                result = self._run_scenarios()
+
+            run_once = False
 
         print("No more scenarios .... Exiting")
         return result
@@ -583,7 +602,7 @@ def main():
 
     parser.add_argument(
         '--scenario', help='Name of the scenario to be executed. Use the preposition \'group:\' to run all scenarios of one class, e.g. ControlLoss or FollowLeadingVehicle')
-    parser.add_argument('--openscenario', help='Provide an OpenSCENARIO definition')
+    parser.add_argument('--openscenario', nargs='*', help='Provide OpenSCENARIO definitions')
     parser.add_argument('--openscenarioparams', help='Overwrited for OpenSCENARIO ParameterDeclaration')
     parser.add_argument('--openscenario2', help='Provide an openscenario2 definition')
     parser.add_argument('--route', help='Run a route as a scenario', type=str)
@@ -609,6 +628,8 @@ def main():
     parser.add_argument('--randomize', action="store_true", help='Scenario parameters are randomized')
     parser.add_argument('--repetitions', default=1, type=int, help='Number of scenario executions')
     parser.add_argument('--waitForEgo', action="store_true", help='Connect the scenario to an existing ego vehicle')
+
+    parser.add_argument('--loop', action="store_true", help='Will loop scenarios until application is exited', default=False)
 
     arguments = parser.parse_args()
     # pylint: enable=line-too-long
