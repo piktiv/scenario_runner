@@ -142,7 +142,7 @@
                         <EntityRef entityRef="hero"/>
                       </TriggeringEntities>
                       <EntityCondition>
-                        <ReachPositionCondition tolerance="5.0">
+                        <ReachPositionCondition tolerance="15.0">
                           <Position>
                             <WorldPosition x="140" y="55" z="0" h="180"/>
                           </Position>
