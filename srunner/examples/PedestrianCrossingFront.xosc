@@ -4,12 +4,12 @@
   <ParameterDeclarations/>
   <CatalogLocations/>
   <RoadNetwork>
-    <LogicFile filepath="Town01"/>
+    <LogicFile filepath="Town01_Opt"/>
     <SceneGraphFile filepath=""/>
   </RoadNetwork>
   <Entities>
     <ScenarioObject name="hero">
-      <Vehicle name="vehicle.volkswagen.t2" vehicleCategory="car">
+      <Vehicle name="vehicle.mini.cooper" vehicleCategory="car">
         <ParameterDeclarations/>
         <Performance maxSpeed="69.444" maxAcceleration="200" maxDeceleration="10.0"/>
         <BoundingBox>
@@ -26,7 +26,7 @@
       </Vehicle>
     </ScenarioObject>
     <ScenarioObject name="adversary">
-      <Pedestrian model="walker.pedestrian.0001" mass="90.0" name="walker.pedestrian.0001" pedestrianCategory="pedestrian">
+      <Pedestrian model="walker.*" mass="90.0" name="walker.pedestrian.0001" pedestrianCategory="pedestrian">
         <ParameterDeclarations/>
         <BoundingBox>
           <Center x="1.5" y="0.0" z="0.9"/>
@@ -36,6 +36,18 @@
           <Property name="type" value="simulation"/>
         </Properties>
       </Pedestrian>
+    </ScenarioObject>
+    <ScenarioObject name="goal">
+      <MiscObject name="util.actor.empty" mass="1.0" miscObjectCategory="none">
+        <ParameterDeclarations/>
+        <BoundingBox>
+          <Center x="0.0" y="0.0" z="0.0"/>
+          <Dimensions width="0.0" length="0.0" height="0.0"/>
+        </BoundingBox>
+        <Properties>
+          <Property name="type" value="simulation"/>
+        </Properties>
+      </MiscObject>
     </ScenarioObject>
   </Entities>
   <Storyboard>
@@ -91,6 +103,15 @@
             </TeleportAction>
           </PrivateAction>
         </Private>
+        <Private entityRef="goal">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <WorldPosition x="89" y="90" z="0.3" h="1.57079632679"/>
+              </Position>
+            </TeleportAction>
+          </PrivateAction>
+        </Private>
       </Actions>
     </Init>
     <Story name="MyStory">
@@ -105,9 +126,9 @@
                 <PrivateAction>
                   <LongitudinalAction>
                     <SpeedAction>
-                      <SpeedActionDynamics dynamicsShape="step" value="1.5" dynamicsDimension="distance"/>
+                      <SpeedActionDynamics dynamicsShape="step" value="3" dynamicsDimension="distance"/>
                       <SpeedActionTarget>
-                        <AbsoluteTargetSpeed value="10.0"/>
+                        <AbsoluteTargetSpeed value="15.0"/>
                       </SpeedActionTarget>
                     </SpeedAction>
                   </LongitudinalAction>
@@ -121,7 +142,7 @@
                         <EntityRef entityRef="hero"/>
                       </TriggeringEntities>
                       <EntityCondition>
-                        <ReachPositionCondition tolerance="2.0">
+                        <ReachPositionCondition tolerance="5.0">
                           <Position>
                             <WorldPosition x="140" y="55" z="0" h="180"/>
                           </Position>
@@ -162,7 +183,7 @@
                     <SpeedAction>
                       <SpeedActionDynamics dynamicsShape="step" value="6.5" dynamicsDimension="distance"/>
                       <SpeedActionTarget>
-                        <AbsoluteTargetSpeed value="2.0"/>
+                        <AbsoluteTargetSpeed value="15.0"/>
                       </SpeedActionTarget>
                     </SpeedAction>
                   </LongitudinalAction>
