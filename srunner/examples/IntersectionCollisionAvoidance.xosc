@@ -9,7 +9,7 @@
   </RoadNetwork>
   <Entities>
     <ScenarioObject name="hero">
-      <Vehicle name="vehicle.tesla.model3" vehicleCategory="car">
+      <Vehicle name="vehicle.mini.cooper" vehicleCategory="car">
         <ParameterDeclarations/>
         <Performance maxSpeed="69.444" maxAcceleration="200" maxDeceleration="10.0"/>
         <BoundingBox>
@@ -26,7 +26,7 @@
       </Vehicle>
     </ScenarioObject>
     <ScenarioObject name="adversary">
-      <Vehicle name="vehicle.audi.tt" vehicleCategory="bicycle">
+      <Vehicle name="vehicle.mini.cooper" vehicleCategory="bicycle">
         <ParameterDeclarations/>
         <Performance maxSpeed="69.444" maxAcceleration="200" maxDeceleration="10.0"/>
         <BoundingBox>
@@ -41,6 +41,18 @@
           <Property name="type" value="simulation"/>
         </Properties>
       </Vehicle>
+    </ScenarioObject>
+    <ScenarioObject name="goal">
+      <MiscObject name="util.actor.empty" mass="1.0" miscObjectCategory="none">
+        <ParameterDeclarations/>
+        <BoundingBox>
+          <Center x="0.0" y="0.0" z="0.0"/>
+          <Dimensions width="0.0" length="0.0" height="0.0"/>
+        </BoundingBox>
+        <Properties>
+          <Property name="type" value="simulation"/>
+        </Properties>
+      </MiscObject>
     </ScenarioObject>
   </Entities>
   <Storyboard>
@@ -113,6 +125,15 @@
                 <Gear number="0" active="false"/>
               </OverrideControllerValueAction>
             </ControllerAction>
+          </PrivateAction>
+        </Private>
+        <Private entityRef="goal">
+          <PrivateAction>
+            <TeleportAction>
+              <Position>
+                <WorldPosition x="87.5" y="85" z="0.3" h="-1.56"/>
+              </Position>
+            </TeleportAction>
           </PrivateAction>
         </Private>
       </Actions>
