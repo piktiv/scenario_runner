@@ -60,6 +60,7 @@ import datetime
 import logging
 import math
 import weakref
+import random
 
 try:
     import pygame
@@ -123,12 +124,14 @@ class World(object):
             print('  Make sure it exists, has the same name of your town, and is correct.')
             sys.exit(1)
         self.hud = hud
+        self.args = args
         self.player = None
         self.collision_sensor = None
         self.lane_invasion_sensor = None
         self.gnss_sensor = None
         self.imu_sensor = None
         self.radar_sensor = None
+        self.lidar = None
         self.camera_manager = None
         self.restart()
         self.world.on_tick(hud.on_world_tick)
@@ -144,16 +147,25 @@ class World(object):
         cam_index = self.camera_manager.index if self.camera_manager is not None else 0
         cam_pos_index = self.camera_manager.transform_index if self.camera_manager is not None else 0
 
-        # Get the ego vehicle
-        while self.player is None:
-            print("Waiting for the ego vehicle...")
-            time.sleep(1)
-            possible_vehicles = self.world.get_actors().filter('vehicle.*')
-            for vehicle in possible_vehicles:
-                if vehicle.attributes['role_name'] == 'hero':
-                    print("Ego vehicle found")
-                    self.player = vehicle
-                    break
+        if(self.args.spawn_new_vehicle is None): 
+            # Get the ego vehicle
+            while self.player is None:
+                print("Waiting for the ego vehicle...")
+                time.sleep(1)
+                possible_vehicles = self.world.get_actors().filter('vehicle.*')
+                for vehicle in possible_vehicles:
+                    if vehicle.attributes['role_name'] == 'hero':
+                        print("Ego vehicle found")
+                        self.player = vehicle
+                        break
+        else: 
+            bp = random.choice(self.world.get_blueprint_library().filter(self.args.spawn_new_vehicle))
+            bp.set_attribute("role_name", "hero")
+            if bp.has_attribute("color"):
+                color = random.choice(bp.get_attribute("color").recommended_values)
+                bp.set_attribute("color", color)
+            spawn_point = random.choice(self.world.get_map().get_spawn_points())
+            self.player = self.world.spawn_actor(bp, spawn_point)
 
         self.player_name = self.player.type_id
 
@@ -162,6 +174,7 @@ class World(object):
         self.lane_invasion_sensor = LaneInvasionSensor(self.player, self.hud)
         self.gnss_sensor = GnssSensor(self.player)
         self.imu_sensor = IMUSensor(self.player)
+        self.lidar = LidarSensor(self.player, [300, 300], 100)
         self.camera_manager = CameraManager(self.player, self.hud)
         self.camera_manager.transform_index = cam_pos_index
         self.camera_manager.set_sensor(cam_index, notify=False)
@@ -185,6 +198,8 @@ class World(object):
     def render(self, display):
         self.camera_manager.render(display)
         self.hud.render(display)
+        partial_rect = pygame.Rect(self.lidar.display_size[0] / 2, 0, self.lidar.display_size[0]/2, self.lidar.display_size[1])
+        display.blit(self.lidar.surface, (self.args.width - self.lidar.display_size[0],0), area = partial_rect)
 
     def destroy_sensors(self):
         self.camera_manager.sensor.destroy()
@@ -762,6 +777,74 @@ class RadarSensor(object):
                 life_time=0.06,
                 persistent_lines=False,
                 color=carla.Color(r, g, b))
+            
+
+
+# ==============================================================================
+# -- LiDAR Sensor ---------------------------------------------------------------
+# ==============================================================================
+
+
+class LidarSensor(object):
+    def __init__(self, parent_actor, display_size, range):
+        self.sensor = None
+        self._parent = parent_actor
+        self.range = range
+        self.display_size = display_size
+        self.surface = None
+
+        self.velocity_range = 7.5 # m/s
+        world = self._parent.get_world()
+        self.debug = world.debug
+        bp = world.get_blueprint_library().find('sensor.lidar.ray_cast')
+        bp.set_attribute('dropoff_general_rate', bp.get_attribute('dropoff_general_rate').recommended_values[0])
+        bp.set_attribute('dropoff_intensity_limit', bp.get_attribute('dropoff_intensity_limit').recommended_values[0])
+        bp.set_attribute('dropoff_zero_intensity', bp.get_attribute('dropoff_zero_intensity').recommended_values[0])
+        
+        bp.set_attribute('channels', str(64))
+        bp.set_attribute('range', str(range))
+        bp.set_attribute('points_per_second', str(250000))
+        bp.set_attribute('rotation_frequency', str(20))
+        bp.set_attribute('horizontal_fov', str(45))
+
+        self.sensor = world.spawn_actor(
+            bp,
+            carla.Transform(carla.Location(z=2.4)),
+            attach_to=self._parent)
+        # We need a weak reference to self to avoid circular reference.
+        weak_self = weakref.ref(self)
+        self.sensor.listen(
+            lambda image: LidarSensor._Lidar_callback(weak_self, image))
+
+    @staticmethod
+    def _Lidar_callback(weak_self, image):
+        self = weak_self()
+        if not self:
+            return
+            
+        # t_start = self.timer.time()
+
+        disp_size = self.display_size
+        lidar_range = 2.0*float(self.range)
+
+        points = np.frombuffer(image.raw_data, dtype=np.dtype('f4'))
+        points = np.reshape(points, (int(points.shape[0] / 4), 4))
+        lidar_data = np.array(points[:, :2])
+        lidar_data *= min(disp_size) / lidar_range
+        lidar_data += (0.5 * disp_size[0], 0.5 * disp_size[1])
+        lidar_data = np.fabs(lidar_data)  # pylint: disable=E1111
+        lidar_data = lidar_data.astype(np.int32)
+        lidar_data = np.reshape(lidar_data, (-1, 2))
+        lidar_img_size = (disp_size[0], disp_size[1], 3)
+        lidar_img = np.zeros((lidar_img_size), dtype=np.uint8)
+
+        lidar_img[tuple(lidar_data.T)] = (255, 255, 255)
+
+        self.surface = pygame.surfarray.make_surface(lidar_img)
+
+        # t_end = self.timer.time()
+        # self.time_processing += (t_end-t_start)
+        # self.tics_processing += 1
 
 # ==============================================================================
 # -- CameraManager -------------------------------------------------------------
@@ -886,6 +969,8 @@ def game_loop(args):
     pygame.font.init()
     world = None
 
+    adversaries = []
+
     try:
         client = carla.Client(args.host, args.port)
         client.set_timeout(20.0)
@@ -900,6 +985,26 @@ def game_loop(args):
         hud = HUD(args.width, args.height)
         world = World(sim_world, hud, args)
         controller = KeyboardControl(world, args.autopilot)
+
+        if args.spawn_adversaries is not None: 
+            blueprints = world.world.get_blueprint_library().filter("vehicle.*")
+            spawn_points = world.world.get_map().get_spawn_points()
+            adv_count = int(args.spawn_adversaries)
+            while len(adversaries) < adv_count and len(spawn_points) > 0:  
+                bp = random.choice(blueprints)
+                if bp.has_attribute("color"):
+                    color = random.choice(bp.get_attribute("color").recommended_values)
+                    bp.set_attribute("color", color)
+                spawn_point = random.choice(spawn_points)
+                spawn_points.remove(spawn_point)
+                adversary = world.world.try_spawn_actor(bp, spawn_point)
+                if adversary is not None: 
+                    adversaries.append(adversary)
+                    print('spawned adversary no. {}'.format(len(adversaries)))
+                else: 
+                    print('failed to spawn adversary no. {}'.format(len(adversaries)))
+        
+        print('spawned {} adversaries in the town'.format(len(adversaries)))
 
         sim_world.wait_for_tick()
 
@@ -917,6 +1022,9 @@ def game_loop(args):
 
         if (world and world.recording_enabled):
             client.stop_recorder()
+
+        for adversary in adversaries: 
+            adversary.destroy()
 
         if world is not None:
             # prevent destruction of ego vehicle
@@ -970,6 +1078,16 @@ def main():
         action='store_true',
         help='do not destroy ego vehicle on exit')
     argparser.add_argument(
+        '--spawn_new_vehicle',
+        nargs='?',
+        const='vehicle.*'
+    )
+    argparser.add_argument(
+        '--spawn_adversaries',
+        nargs='?',
+        const=1
+    )
+    argparser.add_argument(
         '--wait-for-repetitions',
         action='store_true',
         help='Avoids stopping the manual control when the scenario ends.')
@@ -983,6 +1101,7 @@ def main():
     logging.info('listening to server %s:%s', args.host, args.port)
 
     print(__doc__)
+    print(args.spawn_adversaries)
 
     try:
 
