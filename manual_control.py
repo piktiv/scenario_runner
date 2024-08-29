@@ -198,8 +198,10 @@ class World(object):
     def render(self, display):
         self.camera_manager.render(display)
         self.hud.render(display)
-        partial_rect = pygame.Rect(self.lidar.display_size[0] / 2, 0, self.lidar.display_size[0]/2, self.lidar.display_size[1])
-        display.blit(self.lidar.surface, (self.args.width - self.lidar.display_size[0],0), area = partial_rect)
+        w = self.lidar.display_size[0]
+        h = self.lidar.display_size[1]
+        partial_rect = pygame.Rect(w / 3, h/4, w *2/ 3, h/2)
+        display.blit(self.lidar.surface, (self.args.width - w *0.9, h/10), area = partial_rect)
 
     def destroy_sensors(self):
         self.camera_manager.sensor.destroy()
@@ -800,12 +802,14 @@ class LidarSensor(object):
         bp.set_attribute('dropoff_general_rate', bp.get_attribute('dropoff_general_rate').recommended_values[0])
         bp.set_attribute('dropoff_intensity_limit', bp.get_attribute('dropoff_intensity_limit').recommended_values[0])
         bp.set_attribute('dropoff_zero_intensity', bp.get_attribute('dropoff_zero_intensity').recommended_values[0])
+        bp.set_attribute('upper_fov', '5')
+        bp.set_attribute('lower_fov', '-5')
         
         bp.set_attribute('channels', str(64))
         bp.set_attribute('range', str(range))
         bp.set_attribute('points_per_second', str(250000))
         bp.set_attribute('rotation_frequency', str(20))
-        bp.set_attribute('horizontal_fov', str(45))
+        bp.set_attribute('horizontal_fov', str(25))
 
         self.sensor = world.spawn_actor(
             bp,
